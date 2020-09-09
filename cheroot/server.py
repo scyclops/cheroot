@@ -1629,6 +1629,9 @@ class HTTPServer:
             self.sstat('event-time', elapsed)
 
         '''
+        if not self.debug:
+            return
+        
         if value is None:
             self.second_stats[key] += 1
         else:
