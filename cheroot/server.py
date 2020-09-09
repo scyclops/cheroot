@@ -1656,8 +1656,8 @@ class HTTPServer:
                                 #minv = min(val) # not interesting
                                 maxv = max(val)
                                 avgv = sum(val) / len(val)
-
-                                fp.write('\n\t' + str(len(val)).rjust(10) + ' ' + key + '(max %.3f avg %.3f) ' % (maxv, avgv))
+                                if maxv >= 0.001:
+                                    fp.write('\n\t' + str(len(val)).rjust(10) + ' ' + key + ' - max %.3f avg %.3f' % (maxv, avgv))
                             else:
                                 fp.write('\n\t' + str(val).rjust(10) + ' ' + key)
 
@@ -2113,13 +2113,9 @@ class HTTPServer:
         if conn:
             try:
                 pcstart = time.time()
-
                 self.requests.put((conn, start))
-
                 elapsed = time.time() - pcstart
-                if elapsed > 0:
-                    self.sstat('put-conn', elapsed)
-
+                self.sstat('put-conn', elapsed)
             except queue.Full:
                 # Just drop the conn. TODO: write 503 back?
                 conn.close()
