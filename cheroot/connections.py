@@ -174,7 +174,7 @@ class ConnectionManager:
         try:
             return self._readable_conns.popleft()
         except IndexError:
-            self.server.sstat('gc-indexerr')
+            #self.server.sstat('gc-indexerr') 
             return None
 
     def _from_server_socket(self, server_socket):  # noqa: C901  # FIXME

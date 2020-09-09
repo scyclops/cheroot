@@ -1653,11 +1653,11 @@ class HTTPServer:
                         val = self.second_stats.pop(key, None)
                         if val:
                             if isinstance(val, list):
-                                minv = min(val)
+                                #minv = min(val) # not interesting
                                 maxv = max(val)
                                 avgv = sum(val) / len(val)
 
-                                fp.write(str(len(val)) + ' ' + key + '(%.3fmin %.3fmax %.3favg) ' % (minv, maxv, avgv) + '  |  ')
+                                fp.write(str(len(val)) + ' ' + key + '(max %.3f avg %.3f) ' % (maxv, avgv) + '  |  ')
                             else:
                                 fp.write(str(val) + ' ' + key + '  |  ')
 
