@@ -107,9 +107,14 @@ class WorkerThread(threading.Thread):
         try:
             self.ready = True
             while True:
-                conn = self.server.requests.get()
-                if conn is _SHUTDOWNREQUEST:
+                obj = self.server.requests.get()
+                if obj is _SHUTDOWNREQUEST:
                     return
+
+                conn, accept_time = obj
+                self.server.sstat('work-start-conn', time.time() - accept_time)
+
+                start = time.time()
 
                 self.conn = conn
                 is_stats_enabled = self.server.stats['Enabled']
@@ -130,6 +135,9 @@ class WorkerThread(threading.Thread):
                         self.work_time += time.time() - self.start_time
                         self.start_time = None
                     self.conn = None
+
+                self.server.sstat('work-conn', time.time() - start)
+
         except (KeyboardInterrupt, SystemExit) as ex:
             self.server.interrupt = ex
 

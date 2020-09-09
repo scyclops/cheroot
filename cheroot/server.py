@@ -76,6 +76,9 @@ import platform
 import contextlib
 import threading
 
+from datetime import datetime
+from collections import Counter
+
 try:
     from functools import lru_cache
 except ImportError:
@@ -1274,6 +1277,7 @@ class HTTPConnection:
             if self.server.stats['Enabled']:
                 self.requests_seen += 1
             if not req.ready:
+                self.sstat('req-not-ready')
                 # Something went wrong in the parsing (and the server has
                 # probably already made a simple_response). Return and
                 # let the conn close.
@@ -1282,12 +1286,14 @@ class HTTPConnection:
             request_seen = True
             req.respond()
             if not req.close_connection:
+                self.sstat('keep-conn-open')
                 return True
         except socket.error as ex:
             errnum = ex.args[0]
             # sadly SSL sockets return a different (longer) time out string
             timeout_errs = 'timed out', 'The read operation timed out'
             if errnum in timeout_errs:
+                self.sstat('socket-timeout-err')
                 # Don't error if we're between requests; only error
                 # if 1) no request has been started at all, or 2) we're
                 # in the middle of a request.
@@ -1295,11 +1301,15 @@ class HTTPConnection:
                 if (not request_seen) or (req and req.started_request):
                     self._conditional_error(req, '408 Request Timeout')
             elif errnum not in errors.socket_errors_to_ignore:
+                self.sstat('socket-other-err')
                 self.server.error_log(
                     'socket.error %s' % repr(errnum),
                     level=logging.WARNING, traceback=True,
                 )
                 self._conditional_error(req, '500 Internal Server Error')
+            else:
+                self.sstat('socket-ignore-err')
+                
         except (KeyboardInterrupt, SystemExit):
             raise
         except errors.FatalSSLAlert:
@@ -1307,6 +1317,7 @@ class HTTPConnection:
         except errors.NoSSLError:
             self._handle_no_ssl(req)
         except Exception as ex:
+            self.sstat('communicate-err')
             self.server.error_log(
                 repr(ex), level=logging.ERROR, traceback=True,
             )
@@ -1570,6 +1581,7 @@ class HTTPServer:
         self, bind_addr, gateway,
         minthreads=10, maxthreads=-1, server_name=None,
         peercreds_enabled=False, peercreds_resolve_enabled=False,
+        debug=False
     ):
         """Initialize HTTPServer instance.
 
@@ -1597,6 +1609,62 @@ class HTTPServer:
             peercreds_resolve_enabled and peercreds_enabled
         )
         self.clear_stats()
+
+
+        self.debug = debug
+        self.second_stats = Counter() # track & report stats every second
+        self.second_stats_fn = '/tmp/cheroot-%s-%s' % (
+            os.getpid(),
+            str(self.bind_addr) if not isinstance(self.bind_addr, tuple) else ':'.join(map(str, self.bind_addr))
+        )
+        self.last_ss_write = int(time.time())
+
+
+    # XXX: may need locks around the calls to write_second_stats..
+
+    def sstat(self, key, value=None, write=False, force_write=False):
+        '''
+        eg.
+            self.sstat('event')
+            self.sstat('event-time', elapsed)
+
+        '''
+        if value is None:
+            self.second_stats[key] += 1
+        else:
+            self.second_stats.setdefault(key, []).append(value)
+
+        current_second = int(time.time())
+        if force_write or current_second != self.last_ss_write:
+            self.last_ss_write = current_second
+            self.write_second_stats()
+
+    def write_second_stats(self):
+        try:
+            dt = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+
+            with open(self.second_stats_fn, 'a') as fp:
+                keys = sorted(self.second_stats.keys())
+
+                if keys:
+                    fp.write(dt + ' - ')
+
+                    for key in keys:
+                        val = self.second_stats.pop(key, None)
+                        if val:
+                            if isinstance(val, list):
+                                minv = min(val)
+                                maxv = max(val)
+                                avgv = sum(val) / len(val)
+
+                                fp.write(str(len(val)) + ' ' + key + '(%.4fmin %.4fmax %.4favg) ' % (minv, maxv, avgv) + '  |  ')
+                            else:
+                                fp.write(str(val) + ' ' + key + '  |  ')
+
+                    fp.write('\n')
+        except Exception as e:
+            self.error_log('error writing second stats: %s' % e, traceback=True)
+
 
     def clear_stats(self):
         """Reset server stat counters.."""
@@ -2035,15 +2103,26 @@ class HTTPServer:
 
     def tick(self):
         """Accept a new connection and put it on the Queue."""
+
+        start = time.time()
+        qfull = False
+
         conn = self._connections.get_conn()
+        self.sstat('get-conn', time.time() - start)
+
         if conn:
             try:
-                self.requests.put(conn)
+                pcstart = time.time()
+                self.requests.put((conn, start))
+                self.sstat('put-conn', time.time() - pcstart)
             except queue.Full:
                 # Just drop the conn. TODO: write 503 back?
                 conn.close()
+                qfull = True
 
         self._connections.expire()
+
+        self.sstat('tick' + ('-full' if qfull else ''), time.time() - start, write=True)
 
     @property
     def interrupt(self):
@@ -2053,6 +2132,9 @@ class HTTPServer:
     @interrupt.setter
     def interrupt(self, interrupt):
         """Perform the shutdown of this server and save the exception."""
+
+        self.sstat('INTERRUPT', write=True)
+
         self._interrupt = True
         self.stop()
         self._interrupt = interrupt
@@ -2061,6 +2143,9 @@ class HTTPServer:
 
     def stop(self):  # noqa: C901  # FIXME
         """Gracefully shutdown a server that is serving forever."""
+
+        self.sstat('STOP', write=True)
+
         self.ready = False
         if self._start_time is not None:
             self._run_time += (time.time() - self._start_time)
@@ -2113,6 +2198,8 @@ class HTTPServer:
 
         self._connections.close()
         self.requests.stop(self.shutdown_timeout)
+
+        self.sstat('STOPPED', force_write=True)
 
 
 class Gateway:

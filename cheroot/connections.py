@@ -108,6 +108,7 @@ class ConnectionManager:
         for sock_fd, conn in timed_out_connections:
             self._selector.unregister(sock_fd)
             conn.close()
+            self.server.sstat('timed-out-conn-closed')
 
     def get_conn(self):  # noqa: C901  # FIXME
         """Return a HTTPConnection object which is ready to be handled.
@@ -137,6 +138,8 @@ class ConnectionManager:
                 in self._selector.select(timeout=0.01)
             ]
         except OSError:
+            self.server.sstat('gc-oserror')
+
             # Mark any connection which no longer appears valid
             invalid_entries = []
             for _, key in self._selector.get_map().items():
@@ -171,6 +174,7 @@ class ConnectionManager:
         try:
             return self._readable_conns.popleft()
         except IndexError:
+            self.server.sstat('gc-indexerr')
             return None
 
     def _from_server_socket(self, server_socket):  # noqa: C901  # FIXME
@@ -241,6 +245,7 @@ class ConnectionManager:
             # The only reason for the timeout in start() is so we can
             # notice keyboard interrupts on Win32, which don't interrupt
             # accept() by default
+            self.server.sstat('fss-timeout')
             return
         except socket.error as ex:
             if self.server.stats['Enabled']:
@@ -252,15 +257,20 @@ class ConnectionManager:
                 # will then go ahead and poll for and handle the signal
                 # elsewhere. See
                 # https://github.com/cherrypy/cherrypy/issues/707.
+                self.server.sstat('fss-eintr')
                 return
             if ex.args[0] in errors.socket_errors_nonblocking:
                 # Just try again. See
                 # https://github.com/cherrypy/cherrypy/issues/479.
+                self.server.sstat('fss-nonblocking')
                 return
             if ex.args[0] in errors.socket_errors_to_ignore:
                 # Our socket was closed.
                 # See https://github.com/cherrypy/cherrypy/issues/686.
+                self.server.sstat('fss-err-ignore')
                 return
+
+            self.server.sstat('fss-other-err')
             raise
 
     def close(self):
