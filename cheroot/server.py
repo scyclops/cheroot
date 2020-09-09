@@ -1615,7 +1615,7 @@ class HTTPServer:
         self.second_stats = Counter() # track & report stats every second
         self.second_stats_fn = '/tmp/cheroot-%s-%s' % (
             os.getpid(),
-            str(self.bind_addr) if not isinstance(self.bind_addr, tuple) else ':'.join(map(str, self.bind_addr))
+            str(self.bind_addr) if not isinstance(self.bind_addr, tuple) else '_'.join(map(str, self.bind_addr))
         )
         self.last_ss_write = int(time.time())
 
