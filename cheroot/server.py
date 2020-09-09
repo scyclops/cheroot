@@ -1657,9 +1657,9 @@ class HTTPServer:
                                 maxv = max(val)
                                 avgv = sum(val) / len(val)
 
-                                fp.write('\n\t' + str(len(val)) + ' ' + key + '(max %.3f avg %.3f) ' % (maxv, avgv))
+                                fp.write('\n\t' + str(len(val)).rjust(10) + ' ' + key + '(max %.3f avg %.3f) ' % (maxv, avgv))
                             else:
-                                fp.write('\n\t' + str(val) + ' ' + key)
+                                fp.write('\n\t' + str(val).rjust(10) + ' ' + key)
 
                     fp.write('\n')
         except Exception as e:
