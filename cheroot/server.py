@@ -2113,8 +2113,13 @@ class HTTPServer:
         if conn:
             try:
                 pcstart = time.time()
+
                 self.requests.put((conn, start))
-                self.sstat('put-conn', time.time() - pcstart)
+
+                elapsed = time.time() - pcstart
+                if elapsed > 0:
+                    self.sstat('put-conn', elapsed)
+                
             except queue.Full:
                 # Just drop the conn. TODO: write 503 back?
                 conn.close()
