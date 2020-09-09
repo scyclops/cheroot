@@ -1647,7 +1647,7 @@ class HTTPServer:
                 keys = sorted(self.second_stats.keys())
 
                 if keys:
-                    fp.write(dt + ' - ')
+                    fp.write(dt)
 
                     for key in keys:
                         val = self.second_stats.pop(key, None)
@@ -1657,9 +1657,9 @@ class HTTPServer:
                                 maxv = max(val)
                                 avgv = sum(val) / len(val)
 
-                                fp.write(str(len(val)) + ' ' + key + '(max %.3f avg %.3f) ' % (maxv, avgv) + '  |  ')
+                                fp.write('\n\t' + str(len(val)) + ' ' + key + '(max %.3f avg %.3f) ' % (maxv, avgv))
                             else:
-                                fp.write(str(val) + ' ' + key + '  |  ')
+                                fp.write('\n\t' + str(val) + ' ' + key)
 
                     fp.write('\n')
         except Exception as e:
@@ -2119,7 +2119,7 @@ class HTTPServer:
                 elapsed = time.time() - pcstart
                 if elapsed > 0:
                     self.sstat('put-conn', elapsed)
-                
+
             except queue.Full:
                 # Just drop the conn. TODO: write 503 back?
                 conn.close()
