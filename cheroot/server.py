@@ -1277,7 +1277,7 @@ class HTTPConnection:
             if self.server.stats['Enabled']:
                 self.requests_seen += 1
             if not req.ready:
-                self.sstat('req-not-ready')
+                self.server.sstat('req-not-ready')
                 # Something went wrong in the parsing (and the server has
                 # probably already made a simple_response). Return and
                 # let the conn close.
@@ -1286,14 +1286,14 @@ class HTTPConnection:
             request_seen = True
             req.respond()
             if not req.close_connection:
-                self.sstat('keep-conn-open')
+                self.server.sstat('keep-conn-open')
                 return True
         except socket.error as ex:
             errnum = ex.args[0]
             # sadly SSL sockets return a different (longer) time out string
             timeout_errs = 'timed out', 'The read operation timed out'
             if errnum in timeout_errs:
-                self.sstat('socket-timeout-err')
+                self.server.sstat('socket-timeout-err')
                 # Don't error if we're between requests; only error
                 # if 1) no request has been started at all, or 2) we're
                 # in the middle of a request.
@@ -1301,15 +1301,15 @@ class HTTPConnection:
                 if (not request_seen) or (req and req.started_request):
                     self._conditional_error(req, '408 Request Timeout')
             elif errnum not in errors.socket_errors_to_ignore:
-                self.sstat('socket-other-err')
+                self.server.sstat('socket-other-err')
                 self.server.error_log(
                     'socket.error %s' % repr(errnum),
                     level=logging.WARNING, traceback=True,
                 )
                 self._conditional_error(req, '500 Internal Server Error')
             else:
-                self.sstat('socket-ignore-err')
-                
+                self.server.sstat('socket-ignore-err')
+
         except (KeyboardInterrupt, SystemExit):
             raise
         except errors.FatalSSLAlert:
@@ -1317,7 +1317,7 @@ class HTTPConnection:
         except errors.NoSSLError:
             self._handle_no_ssl(req)
         except Exception as ex:
-            self.sstat('communicate-err')
+            self.server.sstat('communicate-err')
             self.server.error_log(
                 repr(ex), level=logging.ERROR, traceback=True,
             )
@@ -1657,7 +1657,7 @@ class HTTPServer:
                                 maxv = max(val)
                                 avgv = sum(val) / len(val)
 
-                                fp.write(str(len(val)) + ' ' + key + '(%.4fmin %.4fmax %.4favg) ' % (minv, maxv, avgv) + '  |  ')
+                                fp.write(str(len(val)) + ' ' + key + '(%.3fmin %.3fmax %.3favg) ' % (minv, maxv, avgv) + '  |  ')
                             else:
                                 fp.write(str(val) + ' ' + key + '  |  ')
 
