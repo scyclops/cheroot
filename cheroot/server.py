@@ -1631,7 +1631,7 @@ class HTTPServer:
         '''
         if not self.debug:
             return
-        
+
         if value is None:
             self.second_stats[key] += 1
         else:
@@ -1663,6 +1663,14 @@ class HTTPServer:
                                     fp.write('\n\t' + str(len(val)).rjust(10) + ' ' + key + ' - max %.3f avg %.3f' % (maxv, avgv))
                             else:
                                 fp.write('\n\t' + str(val).rjust(10) + ' ' + key)
+
+                    num_threads = len(getattr(self.requests, '_threads', []))
+                    idle_threads = getattr(self.requests, 'idle', None)
+                    queue_size = getattr(self.requests, 'qsize', None)
+
+                    fp.write('\n\t' + str(num_threads).rjust(10) + ' num-threads')
+                    fp.write('\n\t' + str(idle_threads).rjust(10) + ' idle-threads')
+                    fp.write('\n\t' + str(queue_size).rjust(10) + ' queue-size')
 
                     fp.write('\n')
         except Exception as e:
@@ -2123,6 +2131,8 @@ class HTTPServer:
                 # Just drop the conn. TODO: write 503 back?
                 conn.close()
                 qfull = True
+
+        # XXX: could individual time .close & .expire and then remove the tick call below
 
         self._connections.expire()
 
