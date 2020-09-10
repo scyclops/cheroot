@@ -1668,8 +1668,7 @@ class HTTPServer:
                     idle_threads = getattr(self.requests, 'idle', None)
                     queue_size = getattr(self.requests, 'qsize', None)
 
-                    fp.write('\n\t' + str(num_threads).rjust(10) + ' num-threads')
-                    fp.write('\n\t' + str(idle_threads).rjust(10) + ' idle-threads')
+                    fp.write('\n\t' + str(num_threads).rjust(10) + ' threads (%s idle)' % idle_threads)
                     fp.write('\n\t' + str(queue_size).rjust(10) + ' queue-size')
 
                     fp.write('\n')
