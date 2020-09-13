@@ -1874,7 +1874,7 @@ class HTTPServer:
         while self.ready:
             try:
                 self.tick()
-            except (KeyboardInterrupt, SystemExit) as e:
+            except (KeyboardInterrupt, SystemExit):
                 self.serving = False
                 raise
             except Exception:
