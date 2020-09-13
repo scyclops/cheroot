@@ -290,7 +290,7 @@ class ThreadPool:
         )
 
         for worker in self._clear_threads():
-            remaining_time = timeout and endtime - time.time()
+            remaining_time = timeout and min(0, endtime - time.time())
             try:
                 worker.join(remaining_time)
                 if worker.is_alive():
